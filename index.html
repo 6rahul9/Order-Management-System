@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Order Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-dark" :style="{ backgroundColor: uiConfig.theme.primary_color }">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">
+                    <img v-if="uiConfig.logo" :src="'/static/images/' + uiConfig.logo" height="30" class="d-inline-block align-top me-2">
+                    {{ uiConfig.company_name }}
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" @click="currentView = 'dashboard'">Dashboard</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" @click="currentView = 'workOrders'">Work Orders</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" @click="currentView = 'settings'">Settings</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container-fluid mt-4">
+            <!-- Dashboard View -->
+            <div v-if="currentView === 'dashboard'" class="row">
+                <div class="col-12">
+                    <h2>Dashboard</h2>
+                    <div class="row mt-4">
+                        <div class="col-md-3 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Total Work Orders</h5>
+                                    <h2 class="card-text">{{ workOrders.length }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Pending</h5>
+                                    <h2 class="card-text">{{ workOrders.filter(wo => wo.status === 'Pending').length }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Scheduled</h5>
+                                    <h2 class="card-text">{{ workOrders.filter(wo => wo.status === 'Scheduled').length }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Completed</h5>
+                                    <h2 class="card-text">{{ workOrders.filter(wo => wo.status === 'Completed').length }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    Recent Work Orders
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Order ID</th>
+                                                    <th>Customer</th>
+                                                    <th>Status</th>
+                                                    <th>Due Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-for="order in workOrders.slice(0, 5)" :key="order.id" @click="viewWorkOrder(order.id)">
+                                                    <td>{{ order.order_id }}</td>
+                                                    <td>{{ order.customer }}</td>
+                                                    <td>
+                                                        <span class="badge" :style="getStatusStyle(order.status)">
+                                                            {{ order.status }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ formatDate(order.due_date) }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    Work Orders by Status
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="statusChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Work Orders View -->
+            <div v-if="currentView === 'workOrders'" class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h2>Work Orders</h2>
+                        <div>
+                            <button class="btn btn-primary" @click="showWorkOrderModal()">
+                                <i class="bi bi-plus-lg"></i> Add New Work
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Section -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Search</h5>
+                                <button class="btn btn-sm btn-outline-secondary" @click="toggleAdvancedSearch">
+                                    {{ showAdvancedSearch ? 'Simple Search' : 'Advanced Search' }}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="searchOrderId" class="form-label">Order ID</label>
+                                    <input type="text" class="form-control" id="searchOrderId" v-model="searchFilters.order_id">
+                                </div>
+                                
+                                <template v-if="showAdvancedSearch">
+                                    <div class="col-md-4" v-for="(field, key) in fieldConfig" :key="key" v-if="field.enabled && !['order_id', 'description', 'notes'].includes(key)">
+                                        <label :for="'search' + key" class="form-label">{{ field.label }}</label>
+                                        <input type="text" class="form-control" :id="'search' + key" v-model="searchFilters[key]">
+                                    </div>
+                                </template>
+                                
+                                <div class="col-12">
+                                    <button class="btn btn-primary" @click="searchWorkOrders">Search</button>
+                                    <button class="btn btn-secondary ms-2" @click="resetSearch">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Work Order List -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Work Order List</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th @click="sortBy('customer')">Customer <i class="bi" :class="getSortIcon('customer')"></i></th>
+                                            <th @click="sortBy('status')">Status <i class="bi" :class="getSortIcon('status')"></i></th>
+                                            <th @click="sortBy('due_date')">Due Date <i class="bi" :class="getSortIcon('due_date')"></i></th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="order in sortedWorkOrders" :key="order.id">
+                                            <td>{{ order.customer }}</td>
+                                            <td>
+                                                <span class="badge" :style="getStatusStyle(order.status)">
+                                                    {{ order.status }}
+                                                </span>
+                                            </td>
+                                            <td>{{ formatDate(order.due_date) }}</td>
+                                            <td>
+                                                <div class="btn-group">
+                                                    <button class="btn btn-sm btn-outline-primary" @click="viewWorkOrder(order.id)">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary" @click="showWorkOrderModal(order)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" @click="confirmDeleteWorkOrder(order)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-success" @click="showRecurringModal(order)">
+                                                        <i class="bi bi-arrow-repeat"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-info" @click="printWorkOrder(order)">
+                                                        <i class="bi bi-printer"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination -->
+                            <nav>
+                                <ul class="pagination justify-content-center">
+                                    <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                                        <a class="page-link" href="#" @click.prevent="currentPage--">Previous</a>
+                                    </li>
+                                    <li class="page-item" v-for="page in totalPages" :key="page" :class="{ active: currentPage === page }">
+                                        <a class="page-link" href="#" @click.prevent="currentPage = page">{{ page }}</a>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                                        <a class="page-link" href="#" @click.prevent="currentPage++">Next</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div v-if="currentView === 'settings'" class="row">
+                <div class="col-12">
+                    <h2>System Settings</h2>
+                    
+                    <ul class="nav nav-tabs mb-4">
+                        <li class="nav-item">
+                            <a class="nav-link" :class="{ active: settingsTab === 'fields' }" href="#" @click="settingsTab = 'fields'">Fields</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" :class="{ active: settingsTab === 'statuses' }" href="#" @click="settingsTab = 'statuses'">Statuses</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" :class="{ active: settingsTab === 'ui' }" href="#" @click="settingsTab = 'ui'">UI Settings</a>
+                        </li>
+                    </ul>
+                    
+                    <!-- Fields Settings -->
+                    <div v-if="settingsTab === 'fields'" class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Field Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Field</th>
+                                            <th>Label</th>
+                                            <th>Enabled</th>
+                                            <th>Required</th>
+                                            <th>Order</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                               
+(Content truncated due to size limit. Use line ranges to read in chunks)
